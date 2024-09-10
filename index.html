@@ -1,0 +1,253 @@
+<p><meta charset="UTF-8"> <meta content="width=device-width, initial-scale=1.0" name="viewport"> <strong>Catch Good Objects</strong>: <code>🍎 Apple, 🍌 Banana, 🍇 Grapes</code></p>
+<p><strong>Do not Catch Bad Objects</strong>: <code>🍕 Pizza, 🍟 Fries, 🍔 Burgers</code></p>
+<p><br> <button id="startButton">Start Game</button> <canvas height="400" width="600" id="gameCanvas"></canvas></p>
+<div id="couponDiv" class="coupon">
+<p>Congratulations! You've earned a discount:</p>
+<p id="couponText">Coupon: <span id="couponCode"></span></p>
+<button onclick="copyCoupon()">Copy Coupon</button> <button onclick="retryGame()">Retry</button></div>
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const startButton = document.getElementById('startButton');
+    const couponDiv = document.getElementById('couponDiv');
+    const couponCodeElement = document.getElementById('couponCode');
+
+    let basket = {
+        x: canvas.width / 2 - 40,
+        y: canvas.height - 40,
+        width: 80,
+        height: 20,
+        dx: 20 // Increased basket speed
+    };
+
+    let objects = [];
+    let fallingSpeed = 2;
+    let spawnInterval = 1000;
+    let score = 0;
+    let gameStarted = false;
+    let gameOver = false;
+
+    const goodObjects = ['🍎', '🍌', '🍇'];
+    const badObjects = ['🍕', '🍟', '🍔'];
+
+    // Create falling objects
+    function createObject() {
+        const isGood = Math.random() > 0.3; // 70% chance for good objects
+        const objectType = isGood
+            ? goodObjects[Math.floor(Math.random() * goodObjects.length)]
+            : badObjects[Math.floor(Math.random() * badObjects.length)];
+
+        objects.push({
+            x: Math.random() * (canvas.width - 30),
+            y: 0,
+            width: 30,
+            height: 30,
+            type: objectType,
+            isGood: isGood
+        });
+
+        fallingSpeed += 0.05;  // Increase speed over time
+        spawnInterval -= 10;  // Increase difficulty by reducing spawn time
+        if (spawnInterval < 400) spawnInterval = 400;  // Cap the spawn interval
+
+        // Create the next object
+        setTimeout(createObject, spawnInterval);
+    }
+
+    // Draw basket
+    function drawBasket() {
+        ctx.fillStyle = '#007bff';
+        ctx.fillRect(basket.x, basket.y, basket.width, basket.height);
+    }
+
+    // Draw falling objects
+    function drawObjects() {
+        ctx.font = '30px Arial';
+        objects.forEach(object => {
+            ctx.fillText(object.type, object.x, object.y);
+            object.y += fallingSpeed;
+        });
+    }
+
+    // Check if the basket catches an object or misses a good object
+    function checkCatch() {
+        objects.forEach((object, index) => {
+            // Check if object is caught by the basket
+            if (
+                object.x < basket.x + basket.width &&
+                object.x + object.width > basket.x &&
+                object.y + object.height > basket.y
+            ) {
+                if (object.isGood) {
+                    score += 1;
+                } else {
+                    gameOver = true;
+                    displayCoupon(score);
+                }
+                objects.splice(index, 1);  // Remove object after catching
+            }
+
+            // Game over if a good object is missed
+            if (object.y > canvas.height) {
+                if (object.isGood) {
+                    gameOver = true;
+                    displayCoupon(score);
+                }
+                objects.splice(index, 1);  // Remove object that falls off screen
+            }
+        });
+    }
+
+    // Move the basket left and right
+    function moveBasket(direction) {
+        if (direction === 'left' && basket.x > 0) {
+            basket.x -= basket.dx;
+        } else if (direction === 'right' && basket.x + basket.width < canvas.width) {
+            basket.x += basket.dx;
+        }
+    }
+
+    // Handle keydown events for basket movement
+    document.addEventListener('keydown', function (e) {
+        if (gameStarted && !gameOver) {
+            if (e.code === 'ArrowLeft') {
+                moveBasket('left');
+            } else if (e.code === 'ArrowRight') {
+                moveBasket('right');
+            }
+        }
+    });
+
+    // Add mobile swipe controls
+    let isDragging = false;
+    let startX;
+
+    canvas.addEventListener('touchstart', function (e) {
+        startX = e.touches[0].clientX;
+        isDragging = true;
+    });
+
+    canvas.addEventListener('touchmove', function (e) {
+        if (isDragging) {
+            let touchX = e.touches[0].clientX;
+            let moveX = touchX - startX;
+            basket.x += moveX;
+            startX = touchX;
+
+            // Ensure basket stays within canvas bounds
+            if (basket.x < 0) basket.x = 0;
+            if (basket.x + basket.width > canvas.width) basket.x = canvas.width - basket.width;
+        }
+    });
+
+    canvas.addEventListener('touchend', function () {
+        isDragging = false;
+    });
+
+    // Game loop
+    function gameLoop() {
+        if (gameOver) return;
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        drawBasket();
+        drawObjects();
+        checkCatch();
+
+        // Display Score
+        ctx.font = '20px Arial';
+        ctx.fillStyle = '#000';
+        ctx.fillText(`Score: ${score}`, 20, 30);
+
+        requestAnimationFrame(gameLoop);
+    }
+
+    // Display Coupon Based on Score
+    function displayCoupon(score) {
+        let coupon;
+        if (score < 10) {
+            coupon = "PASTA5";
+        } else if (score >= 10 && score < 20) {
+            coupon = "PASTA10";
+        } else {
+            coupon = "PASTA15";
+        }
+
+        couponCodeElement.textContent = coupon;
+        couponDiv.style.display = 'block';
+        canvas.style.display = 'none';  // Hide the canvas after the game ends
+    }
+
+    // Copy Coupon Code
+    function copyCoupon() {
+        const couponCode = couponCodeElement.textContent;
+        navigator.clipboard.writeText(couponCode).then(() => {
+            alert('Coupon copied to clipboard: ' + couponCode);
+        }).catch(err => {
+            console.error('Could not copy text: ', err);
+        });
+    }
+
+    // Retry Game
+    function retryGame() {
+        document.location.reload();
+    }
+
+    // Start Game on button click
+    startButton.addEventListener('click', function () {
+        gameStarted = true;
+        startButton.style.display = 'none';  // Hide start button
+        createObject();
+        gameLoop();
+    });
+</script>
+<style><!--
+body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 0;
+            padding: 0;
+        }
+        canvas {
+            background-color: #f0f0f0;
+            border: 2px solid #000;
+            display: block;
+            margin: 20px auto;
+        }
+        h1 {
+            margin-top: 20px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 18px;
+            cursor: pointer;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            margin: 10px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .coupon {
+            display: none;
+            margin-top: 20px;
+        }
+        .coupon p {
+            font-size: 24px;
+            font-weight: bold;
+        }
+        #couponCode {
+            font-size: 22px;
+            font-family: monospace;
+            background-color: #f0f0f0;
+            border: 2px solid #000;
+            padding: 10px;
+            display: inline-block;
+        }
+        @media only screen and (max-width: 768px) {
+            canvas {
+                width: 90% !important;
+            }
+        }
+--></style>
